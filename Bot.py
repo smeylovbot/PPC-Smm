@@ -78,8 +78,9 @@ from PIL import Image, ImageDraw, ImageFont
 BOT_TOKEN          = "9017676550:AAHrK6pdRr6dVokUyIY9V6QffPFEHyQLYcc"
 ADMIN_ID           = 8807182741
 
-# រូបភាពស្វាគមន៍ពេលភ្ញៀវចុច /start (ដាក់ក្នុង Folder ដូចគ្នានឹង app.py)
-WELCOME_PHOTO      = "welcome.jpg"
+# ទីតាំង Folder និងរូបភាពស្វាគមន៍ពេលភ្ញៀវចុច /start
+BASE_DIR           = os.path.dirname(os.path.abspath(__file__))
+WELCOME_PHOTO      = os.path.join(BASE_DIR, "welcome.png")
 
 # Bakong KHQR (ដាក់ Token ពេញលេញពីអ៊ីមែលរបស់អ្នក)
 BAKONG_TOKEN       = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiMjI2YTQ5YmJkNWY5NDRhMyJ9LCJpYXQiOjE3OTQxOTIzOTgsImV4cCI6MTgwMTk2ODM5OH0.PggPYpRIIZJA7GzXWWpWnCXcI7VX9-3T3wuy2Pn1e1Y"
@@ -899,6 +900,8 @@ def _show_welcome(uid, name="User"):
             return
         except Exception as e:
             logger.error(f"{CLR_RED}Send welcome photo error: {e}{CLR_RESET}")
+    else:
+        logger.warning(f"{CLR_YELLOW}Welcome photo not found at: {WELCOME_PHOTO}{CLR_RESET}")
     bot.send_message(uid, caption, parse_mode="HTML", reply_markup=main_kb(uid))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("setlang:"))
