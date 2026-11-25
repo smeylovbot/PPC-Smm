@@ -10,7 +10,7 @@
   pip install pyTelegramBotAPI requests flask qrcode pillow --break-system-packages
 """
 
-import json, logging, time, re, threading, hashlib, io, os, sys, subprocess, datetime
+import json, logging, time, re, threading, hashlib, io, os, sys, subprocess, datetime, math
 import requests as http_req
 import telebot
 from telebot.types import (
@@ -146,58 +146,100 @@ smm_poll        = _load(SMM_POLL_FILE,  {"interval": POLL_INTERVAL})
 waiting         = {}   # uid -> step/dict
 lang_cooldown   = {}
 
+DEFAULT_DURATION_PLANS = [
+    {"label": "1ខែ",  "price": 0.00},
+    {"label": "6ខែ",  "price": 0.00},
+    {"label": "1ឆ្នាំ", "price": 0.00},
+    {"label": "2ឆ្នាំ", "price": 0.00},
+]
+
+DEFAULT_SHOP_PRODUCTS = [
+    {"id": "chatgpt_pro",    "name": "Chat GPT Pro",   "icon": "🤖",
+     "desc": "Chat GPT Pro Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "vpn_surfshark",  "name": "VPN Surfshark",  "icon": "🛡️",
+     "desc": "VPN Surfshark Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "super_grok",     "name": "Supper grok",    "icon": "⚡",
+     "desc": "Supper grok Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "youtube_premium","name": "Youtube Premium","icon": "▶️",
+     "desc": "Youtube Premium Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "canva_pro",      "name": "Canva Pro",      "icon": "🎨",
+     "desc": "Canva Pro Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "gemini_pro",     "name": "Gemini Pro",     "icon": "✨",
+     "desc": "Gemini Pro Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+    {"id": "capcut_pro",     "name": "Capcut Pro",     "icon": "✂️",
+     "desc": "Capcut Pro Subscription · Admin កំណត់តម្លៃ",
+     "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]},
+]
+
+DEFAULT_GAME_PRODUCTS = [
+    {"id": "mobilelegends", "name": "Mobile Legends", "icon": "⚔️",
+     "desc": "MLBB Top Up · Delivery via User ID & Zone ID",
+     "plans": [
+         {"label": "86 Diamonds", "price": 1.20},
+         {"label": "172 Diamonds", "price": 2.40},
+         {"label": "257 Diamonds", "price": 3.60},
+         {"label": "706 Diamonds", "price": 9.50}
+     ]},
+    {"id": "freefire", "name": "Free Fire KH/SG", "icon": "💎",
+     "desc": "Free Fire KH/SG Top Up · Delivery via User ID",
+     "plans": [
+         {"label": "Weekly Pass", "price": 1.54},
+         {"label": "Monthly Membership", "price": 7.59},
+         {"label": "Weekly Lite", "price": 0.31},
+         {"label": "20 Diamonds", "price": 0.18},
+         {"label": "40 Diamonds", "price": 0.36},
+         {"label": "60 Diamonds", "price": 0.51},
+         {"label": "100 Diamonds", "price": 0.87},
+         {"label": "160 Diamonds", "price": 1.37},
+         {"label": "205 Diamonds", "price": 1.75},
+         {"label": "420 Diamonds", "price": 3.51},
+         {"label": "650 Diamonds", "price": 5.39},
+         {"label": "840 Diamonds", "price": 6.98},
+         {"label": "1100 Diamonds", "price": 8.79},
+         {"label": "2250 Diamonds", "price": 17.85},
+         {"label": "3350 Diamonds", "price": 25.79},
+         {"label": "4500 Diamonds", "price": 33.85},
+         {"label": "4765 Diamonds", "price": 37.19},
+         {"label": "5600 Diamonds", "price": 43.59},
+         {"label": "6700 Diamonds", "price": 50.79},
+         {"label": "7650 Diamonds", "price": 58.98},
+         {"label": "11500 Diamonds", "price": 87.89}
+     ]},
+    {"id": "roblox", "name": "Roblox Robux", "icon": "🟥",
+     "desc": "Roblox Robux Top Up · Delivery via Username",
+     "plans": [
+         {"label": "400 Robux", "price": 4.99},
+         {"label": "800 Robux", "price": 9.99},
+         {"label": "1700 Robux", "price": 19.99}
+     ]},
+    {"id": "pubgmobile", "name": "PUBG Mobile", "icon": "🔫",
+     "desc": "PUBG Mobile UC Top Up · Delivery via Player ID",
+     "plans": [
+         {"label": "60 UC", "price": 0.99},
+         {"label": "325 UC", "price": 4.99},
+         {"label": "660 UC", "price": 9.99},
+         {"label": "1800 UC", "price": 24.99}
+     ]},
+]
+
 if not products:
-    products = [
-        {"id": "mobilelegends", "name": "Mobile Legends", "icon": "⚔️",
-         "desc": "MLBB Top Up · Delivery via User ID & Zone ID",
-         "plans": [
-             {"label": "86 Diamonds", "price": 1.20},
-             {"label": "172 Diamonds", "price": 2.40},
-             {"label": "257 Diamonds", "price": 3.60},
-             {"label": "706 Diamonds", "price": 9.50}
-         ]},
-        {"id": "freefire", "name": "Free Fire KH/SG", "icon": "💎",
-         "desc": "Free Fire KH/SG Top Up · Delivery via User ID",
-         "plans": [
-             {"label": "Weekly Pass", "price": 1.54},
-             {"label": "Monthly Membership", "price": 7.59},
-             {"label": "Weekly Lite", "price": 0.31},
-             {"label": "20 Diamonds", "price": 0.18},
-             {"label": "40 Diamonds", "price": 0.36},
-             {"label": "60 Diamonds", "price": 0.51},
-             {"label": "100 Diamonds", "price": 0.87},
-             {"label": "160 Diamonds", "price": 1.37},
-             {"label": "205 Diamonds", "price": 1.75},
-             {"label": "420 Diamonds", "price": 3.51},
-             {"label": "650 Diamonds", "price": 5.39},
-             {"label": "840 Diamonds", "price": 6.98},
-             {"label": "1100 Diamonds", "price": 8.79},
-             {"label": "2250 Diamonds", "price": 17.85},
-             {"label": "3350 Diamonds", "price": 25.79},
-             {"label": "4500 Diamonds", "price": 33.85},
-             {"label": "4765 Diamonds", "price": 37.19},
-             {"label": "5600 Diamonds", "price": 43.59},
-             {"label": "6700 Diamonds", "price": 50.79},
-             {"label": "7650 Diamonds", "price": 58.98},
-             {"label": "11500 Diamonds", "price": 87.89}
-         ]},
-        {"id": "roblox", "name": "Roblox Robux", "icon": "🟥",
-         "desc": "Roblox Robux Top Up · Delivery via Username",
-         "plans": [
-             {"label": "400 Robux", "price": 4.99},
-             {"label": "800 Robux", "price": 9.99},
-             {"label": "1700 Robux", "price": 19.99}
-         ]},
-        {"id": "pubgmobile", "name": "PUBG Mobile", "icon": "🔫",
-         "desc": "PUBG Mobile UC Top Up · Delivery via Player ID",
-         "plans": [
-             {"label": "60 UC", "price": 0.99},
-             {"label": "325 UC", "price": 4.99},
-             {"label": "660 UC", "price": 9.99},
-             {"label": "1800 UC", "price": 24.99}
-         ]},
-    ]
+    products = [dict(p, plans=[dict(x) for x in p["plans"]]) for p in (DEFAULT_SHOP_PRODUCTS + DEFAULT_GAME_PRODUCTS)]
     _save(PRODUCTS_FILE, products)
+else:
+    existing_ids = {p["id"] for p in products}
+    added_any = False
+    for sp in DEFAULT_SHOP_PRODUCTS:
+        if sp["id"] not in existing_ids:
+            products.insert(0, dict(sp, plans=[dict(x) for x in sp["plans"]]))
+            added_any = True
+    if added_any:
+        _save(PRODUCTS_FILE, products)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode=None)
 
@@ -470,21 +512,64 @@ def smm_qty_kb(slug, s):
     btns.append([InlineKeyboardButton("🔙 Back", callback_data="back:smmcats")])
     return InlineKeyboardMarkup(btns)
 
-def products_kb():
-    btns = []
+# ─── NEW SHOP UI (2 Columns + Pagination + Reload) ───
+def get_shop_page_content(page=1, per_page=10):
     game_ids = ["mobilelegends", "freefire", "roblox", "pubgmobile"]
-    for p in products:
-        if p["id"] in game_ids: continue
+    shop_prods = [p for p in products if p["id"] not in game_ids]
+
+    total_items = len(shop_prods)
+    total_pages = max(1, math.ceil(total_items / per_page))
+    page = max(1, min(page, total_pages))
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_items = shop_prods[start:end]
+
+    text = (
+        f"🛍️ <b>ហាង ឌីជីថល</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📦 សូមជ្រើសរើសប្រភេទផលិតផល ឬសេវាកម្មខាងក្រោម៖\n"
+        f"📊 <b>{page} / {total_pages}</b>"
+    )
+
+    btns = []
+    row = []
+    for p in page_items:
         total = sum(
             len(stock.get(_stock_key(p["id"], i), []))
             for i in range(len(p.get("plans", [])))
         ) or len(stock.get(p["id"], []))
-        label = f"{p.get('icon','📦')} {p['name']}"
+
+        icon = p.get('icon', '📦')
+        label = f"{icon} {p['name']}"
         if total == 0:
-            label += "  ❌ អស់"
-        btns.append([InlineKeyboardButton(label, callback_data=f"prod:{p['id']}")])
-    btns.append([InlineKeyboardButton("🔙 Back", callback_data="back:main")])
-    return InlineKeyboardMarkup(btns)
+            label += " ❌"
+
+        row.append(InlineKeyboardButton(label, callback_data=f"prod:{p['id']}"))
+        if len(row) == 2:
+            btns.append(row)
+            row = []
+    if row:
+        btns.append(row)
+
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton("← មុន", callback_data=f"shop_page:{page - 1}"))
+
+    nav_row.append(InlineKeyboardButton(f"{page} / {total_pages}", callback_data="noop"))
+
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton("→ បន្ទាប់", callback_data=f"shop_page:{page + 1}"))
+
+    btns.append(nav_row)
+    btns.append([InlineKeyboardButton("🔄 ផ្ទុកឡើងវិញ", callback_data=f"shop_reload:{page}")])
+    btns.append([InlineKeyboardButton("🔙 ត្រឡប់ក្រោយ", callback_data="back:main")])
+
+    return text, InlineKeyboardMarkup(btns)
+
+def products_kb(page=1):
+    _, kb = get_shop_page_content(page)
+    return kb
 
 def plans_kb(prod_id):
     p = _get_product(prod_id)
@@ -1076,6 +1161,34 @@ def cb_game_sel(call):
     except:
         bot.send_message(uid, txt, parse_mode="HTML", reply_markup=plans_kb(gid))
 
+# ─── SHOP PAGINATION & RELOAD CALLBACK ───
+@bot.callback_query_handler(func=lambda c: c.data.startswith("shop_page:") or c.data.startswith("shop_reload:") or c.data == "noop")
+def cb_shop_pagination(call):
+    uid = call.message.chat.id
+    if call.data == "noop":
+        bot.answer_callback_query(call.id)
+        return
+
+    action, page_str = call.data.split(":")
+    page = int(page_str)
+
+    if action == "shop_reload":
+        bot.answer_callback_query(call.id, "🔄 បានផ្ទុកទិន្នន័យឡើងវិញ!")
+    else:
+        bot.answer_callback_query(call.id)
+
+    text, kb = get_shop_page_content(page)
+    try:
+        bot.edit_message_text(
+            text,
+            chat_id=uid,
+            message_id=call.message.message_id,
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+    except Exception:
+        pass
+
 @bot.callback_query_handler(func=lambda c: c.data.startswith("prod:"))
 def cb_prod(call):
     uid  = call.message.chat.id
@@ -1639,7 +1752,11 @@ def cb_back(call):
     if dest == "main":
         _show_welcome(uid, call.from_user.first_name or "User")
     elif dest == "shop":
-        bot.send_message(uid, "🛍️ <b>Shop</b>", parse_mode="HTML", reply_markup=products_kb())
+        txt, kb = get_shop_page_content(1)
+        try:
+            bot.edit_message_text(txt, chat_id=uid, message_id=call.message.message_id, parse_mode="HTML", reply_markup=kb)
+        except:
+            bot.send_message(uid, txt, parse_mode="HTML", reply_markup=kb)
     elif dest == "gamemenu":
         bot.send_message(uid, "💎 <b>ថុបអាប់ហ្គេមទាំងអស់</b>\n━━━━━━━━━━━━━━━━━━\nជ្រើសរើសហ្គេម៖", parse_mode="HTML", reply_markup=game_menu_kb())
     elif dest == "smmcats":
@@ -2063,12 +2180,12 @@ def handle(message):
         if isinstance(step, dict) and step.get("step") == "add_product_desc":
             pid = step["name"].lower().replace(" ","_")
             products.append({"id": pid, "name": step["name"], "icon": step["icon"],
-                             "desc": text, "plans": []})
+                             "desc": text, "plans": [dict(p) for p in DEFAULT_DURATION_PLANS]})
             _save(PRODUCTS_FILE, products)
             waiting.pop(uid, None)
             bot.send_message(uid,
-                f"✅ Product <b>{step['name']}</b> បង្កើតបានរួច!\n"
-                "ប្រើ ✏️ កែតម្លៃ ដើម្បីបន្ថែម plans.",
+                f"✅ Product <b>{step['name']}</b> បង្កើតបានរួច (មាន 1ខែ, 6ខែ, 1ឆ្នាំ, 2ឆ្នាំ)!\n"
+                "ប្រើ ✏️ កែតម្លៃ ដើម្បីកំណត់តម្លៃ។",
                 parse_mode="HTML", reply_markup=admin_kb()); return
 
         if text == "🛍️ ផលិតផល":
@@ -2544,9 +2661,9 @@ def handle(message):
         return
 
     if text in ("🛍️ Shop", "🛍️ ហាងឌីជីថល", "🛍️ ហាង"):
-        bot.send_message(uid,
-            "🛍️ <b>ហាងឌីជីថល</b>\n━━━━━━━━━━━━━━━━━━",
-            parse_mode="HTML", reply_markup=products_kb()); return
+        txt, kb = get_shop_page_content(1)
+        bot.send_message(uid, txt, parse_mode="HTML", reply_markup=kb)
+        return
 
     if text in ("💎 ថុបអាប់ហ្គេម", "💎 Game Top Up"):
         bot.send_message(uid,
